@@ -1,10 +1,7 @@
 import numpy as np
 from random import shuffle
 import matplotlib.pyplot as plt
-
-#Iris-setosa = 0
-#Iris-versicolor = 1
-#Iris-virginica = 2
+from functools import reduce
 
 
 lista = list(range(150))
@@ -15,81 +12,69 @@ tests = lista[120:]
 mydata = np.genfromtxt('iris.txt', delimiter = ",")
 X = mydata[:, :-1].reshape(-1, 4)
 Y = mydata[:, -1].reshape(-1, 1)
+hitRatesPlot = []
+confusionMatrix = []
 
-setosa = {"num": 0}
-versicolor = {"num": 1}
-virginica = {"num": 2}
-
-def train(xtr, ytr, plant):
+def train(Xtr, Ytr, learningRate, eras):
 	totalError = 1
-	learningRate = 0.1
-	plant["hitRatesPlot"] = []
-	plant["w"] = np.array([-0.521, 0.543, -0.510, -0.380, 0.390])
-	for eras in range(100):
+	hitRatesPlotN = []
+	w = np.random.rand(1,5)
+	for n in range(eras):
 		if totalError == 0:
 			break;
 		totalError = 0
 		shuffle(samples)
 		for a in samples:
-			x = np.append(-1, xtr[a])
-			yd = actualOutput(ytr[a], plant["num"])
-			y = predict(x, plant["w"])
-			error = yd - y
+			x = np.append(-1, Xtr[a])
+			d = Ytr[a]
+			y = predict(x, w)
+			error = d - y
 			totalError += abs(error)
-			plant["w"] = plant["w"] + learningRate*error*x
-		plant["hitRatesPlot"].append(test(xtr, ytr, plant))
+			w = w + learningRate*error*x
+		hitRatesPlotN.append(test(Xtr, Ytr, w))
+	hitRatesPlot.append(hitRatesPlotN)
+	return w
 
 
 def predict(x, w):
 	y = 1 if (w*x).sum() >= 0 else 0
 	return y
 
-def actualOutput(y, num):
-	yd = 1 if y == num else 0
-	return yd
-
-def test(xte, yte, plant):
-	TP = sum(list(map(lambda x: 1 if ((predict(np.append(-1, xte[x]), plant["w"]) == actualOutput(yte[x], plant["num"])) and (yte[x] == plant["num"])) else 0,tests)))
-	TN = sum(list(map(lambda x: 1 if ((predict(np.append(-1, xte[x]), plant["w"]) == actualOutput(yte[x], plant["num"])) and (yte[x] != plant["num"])) else 0,tests)))
-	FP = sum(list(map(lambda x: 1 if ((predict(np.append(-1, xte[x]), plant["w"]) != actualOutput(yte[x], plant["num"])) and (yte[x] != plant["num"])) else 0,tests)))
-	FN = sum(list(map(lambda x: 1 if ((predict(np.append(-1, xte[x]), plant["w"]) != actualOutput(yte[x], plant["num"])) and (yte[x] == plant["num"])) else 0,tests)))
-	confusionMatrix = np.array([[TP,FP],[FN,TN]])
+def test(Xte, Yte, w):
+	TP = sum(list(map(lambda x: 1 if ((predict(np.append(-1, Xte[x]), w) == Yte[x]) and (Yte[x] == 1)) else 0,tests)))
+	TN = sum(list(map(lambda x: 1 if ((predict(np.append(-1, Xte[x]), w) == Yte[x]) and (Yte[x] != 1)) else 0,tests)))
+	FP = sum(list(map(lambda x: 1 if ((predict(np.append(-1, Xte[x]), w) != Yte[x]) and (Yte[x] != 1)) else 0,tests)))
+	FN = sum(list(map(lambda x: 1 if ((predict(np.append(-1, Xte[x]), w) != Yte[x]) and (Yte[x] == 1)) else 0,tests)))
+	confusionMatrixN = np.array([[TP,FP],[FN,TN]])
+	confusionMatrix.append(confusionMatrixN)
 	hitRate = (TP + TN)/30
 	return hitRate
 
-def accuracyAndStandardDeviation(xte, yte, plant):
+def accuracyAndStandardDeviation(Xte, Yte):
 	hitRates = []
-	for a in range(100):
-		train(xte, yte, plant)
-		hitRate = test(xte, yte, plant)
+	for a in range(20):
+		w = train(Xte, Yte, 0.1, 100)
+		hitRate = test(Xte, Yte, w)
 		hitRates.append(hitRate)
 	accuracy = (sum(hitRates))/len(hitRates) 
 	standardDeviation = ((sum(map(lambda a: (a - accuracy)**2, hitRates)))/len(hitRates))**(1/2) 
-	plant["accuracy"] = accuracy
-	plant["standardDeviation"] = float(standardDeviation)
+	informations = {"accuracy": accuracy, "standardDeviation": float(standardDeviation)}
+	return informations
 
-train(X, Y, setosa)
-train(X, Y, versicolor)
-train(X, Y, virginica)
+w = train(X, Y, 0.1, 100)
+informations = accuracyAndStandardDeviation(X, Y)
 
-accuracyAndStandardDeviation(X, Y, setosa)
-accuracyAndStandardDeviation(X, Y, versicolor)
-accuracyAndStandardDeviation(X, Y, virginica)
+q = reduce(lambda a, b: a if ((abs((confusionMatrix[a][0][0] + confusionMatrix[a][1][1])/30 - informations["accuracy"])) < (abs((confusionMatrix[b][0][0] + confusionMatrix[b][1][1])/30 - informations["accuracy"]))) else b, range(len(confusionMatrix)))
+greatConfusionMatrix = confusionMatrix[q]
 
-print("vetor w0: {}".format(setosa["w"]))
-print("accuracy: {:.2f}".format(setosa["accuracy"]))
-print("standardDeviation: {:.4f}".format(setosa["standardDeviation"]))
-print("vetor w1: {}".format(versicolor["w"]))
-print("accuracy: {:.2f}".format(versicolor["accuracy"]))
-print("standardDeviation: {:.4f}".format(versicolor["standardDeviation"]))
-print("vetor w2: {}".format(virginica["w"]))
-print("accuracy: {:.2f}".format(virginica["accuracy"]))
-print("standardDeviation: {:.4f}".format(virginica["standardDeviation"]))
+print("vetor w: {}".format(w))
+print("greatConfusionMatrix: \n{}".format(greatConfusionMatrix))
+print("accuracy: {:.4f}".format(informations["accuracy"]))
+print("standardDeviation: {:.4f}".format(informations["standardDeviation"]))
 
-plt.plot(range(len(setosa["hitRatesPlot"])), setosa["hitRatesPlot"], 'r')
-plt.plot(range(len(versicolor["hitRatesPlot"])), versicolor["hitRatesPlot"], 'b')
-plt.plot(range(len(virginica["hitRatesPlot"])), virginica["hitRatesPlot"], 'g')
-plt.title("Taxa de acerto em função das épocas")
+num = reduce(lambda a, b: a if (abs(hitRatesPlot[a][-1] - informations["accuracy"]) < abs(hitRatesPlot[b][-1] - informations["accuracy"]) ) else b, range(len(hitRatesPlot)))
+plot = hitRatesPlot[num]
+plt.plot(range(len(plot)), plot, 'r')
 plt.xlabel("Época")
 plt.ylabel("Taxa de acerto")
 plt.show()
