@@ -12,6 +12,7 @@ tests = lista[120:]
 mydata = np.genfromtxt('iris.txt', delimiter = ",")
 X = mydata[:, :-1].reshape(-1, 4)
 Y = mydata[:, -1].reshape(-1, 1)
+
 hitRatesPlot = []
 confusionMatrix = []
 
@@ -37,37 +38,38 @@ def train(Xtr, Ytr, learningRate, eras):
 
 
 def predict(x, w):
-	y = 1 if (w*x).sum() >= 0 else 0
+	y = 1 if np.dot(w, x) >= 0 else 0
 	return y
 
 def test(Xte, Yte, w):
-	TP = sum(list(map(lambda x: 1 if ((predict(np.append(-1, Xte[x]), w) == Yte[x]) and (Yte[x] == 1)) else 0,tests)))
-	TN = sum(list(map(lambda x: 1 if ((predict(np.append(-1, Xte[x]), w) == Yte[x]) and (Yte[x] != 1)) else 0,tests)))
-	FP = sum(list(map(lambda x: 1 if ((predict(np.append(-1, Xte[x]), w) != Yte[x]) and (Yte[x] != 1)) else 0,tests)))
-	FN = sum(list(map(lambda x: 1 if ((predict(np.append(-1, Xte[x]), w) != Yte[x]) and (Yte[x] == 1)) else 0,tests)))
+	yhat = [predict(np.append(-1, x), w) for x in Xte]
+	TP = sum(list(map(lambda x: 1 if ((yhat[x] == Yte[x]) and (Yte[x] == 1)) else 0, tests)))
+	TN = sum(list(map(lambda x: 1 if ((yhat[x] == Yte[x]) and (Yte[x] != 1)) else 0, tests)))
+	FP = sum(list(map(lambda x: 1 if ((yhat[x] != Yte[x]) and (Yte[x] != 1)) else 0, tests)))
+	FN = sum(list(map(lambda x: 1 if ((yhat[x] != Yte[x]) and (Yte[x] == 1)) else 0, tests)))
 	confusionMatrixN = np.array([[TP,FP],[FN,TN]])
 	confusionMatrix.append(confusionMatrixN)
-	hitRate = (TP + TN)/30
+	hitRate = (TP + TN)/(TP + TN + FP + FN)
 	return hitRate
 
-def accuracyAndStandardDeviation(Xte, Yte):
+def accuracyAndStandardDeviation(Xte, Yte, realizations):
 	hitRates = []
-	for a in range(20):
+	for a in range(realizations):
 		w = train(Xte, Yte, 0.1, 100)
 		hitRate = test(Xte, Yte, w)
 		hitRates.append(hitRate)
-	accuracy = (sum(hitRates))/len(hitRates) 
-	standardDeviation = ((sum(map(lambda a: (a - accuracy)**2, hitRates)))/len(hitRates))**(1/2) 
+	accuracy = np.mean(hitRates) 
+	standardDeviation = np.std(hitRates)
 	informations = {"accuracy": accuracy, "standardDeviation": float(standardDeviation)}
 	return informations
 
 w = train(X, Y, 0.1, 100)
-informations = accuracyAndStandardDeviation(X, Y)
+informations = accuracyAndStandardDeviation(X, Y, 20)
 
-q = reduce(lambda a, b: a if ((abs((confusionMatrix[a][0][0] + confusionMatrix[a][1][1])/30 - informations["accuracy"])) < (abs((confusionMatrix[b][0][0] + confusionMatrix[b][1][1])/30 - informations["accuracy"]))) else b, range(len(confusionMatrix)))
+q = reduce(lambda a, b: a if ((abs((confusionMatrix[a][0][0] + confusionMatrix[a][1][1])/len(tests) - informations["accuracy"])) < (abs((confusionMatrix[b][0][0] + confusionMatrix[b][1][1])/len(tests) - informations["accuracy"]))) else b, range(len(confusionMatrix)))
 greatConfusionMatrix = confusionMatrix[q]
 
-print("vetor w: {}".format(w))
+print("vector w: {}".format(w))
 print("greatConfusionMatrix: \n{}".format(greatConfusionMatrix))
 print("accuracy: {:.4f}".format(informations["accuracy"]))
 print("standardDeviation: {:.4f}".format(informations["standardDeviation"]))
